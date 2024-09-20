@@ -1,6 +1,8 @@
 
 ### Binomial tree class implementation
 
+## Only handle European call option for now
+
 import math
 
 class BinomialTreeNode:
