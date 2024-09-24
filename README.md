@@ -1,1 +1,13 @@
-[WIP] European option pricer with binomial tree
+Option pricing engine [Work in progress]
+
+Done :
+- Pricing of European call and put option usign binomial tree
+
+Todo :
+- Check numerical precision
+- Add other pricing methods
+  - BSM
+  - Monte carlo method
+- Add support for Amperican options
+
+
