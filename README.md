@@ -1,4 +1,4 @@
-Option pricing engine [Work in progress]
+## Option pricing engine [Work in progress]
 
 Done :
 - Pricing of European call and put option usign binomial tree
