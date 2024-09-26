@@ -70,25 +70,27 @@ class BinomialTreeNode:
 
 class BinomialTree:
 	## Manage multi-step pricing
-	def __init__(self, initial_price: float, volatility: float, risk_free_rate: float, strike_price: int, time_step: float, option_class: str, steps_number: int):
+	def __init__(self, option_class: str, option_type: str, initial_price: float, volatility: float, risk_free_rate: float, strike_price: int, time_step: float, steps_number: int):
 		'''
 		Init the tree by initializing the first node
 		'''
 		self.initial_node = BinomialTreeNode(initial_price, volatility, risk_free_rate, strike_price, time_step, option_class)
 		self.steps_number = steps_number
-		self.step_count = 0
+		self.tree_elements = []
 
 	def traverse_tree(self, node, step_count=0):
 		'''
-		Traverse the binomial tree in a lazy manner, option pricing is not properly computed yet (TBC)
+		Traverse the binomial tree in a lazy manner, option pricing is not properly computed yet (probably due to numerical precision - TBC)
+
+		TODO : Add support for american option pricing
 		'''
-		print(self.step_count)
 		print(node)
 
-		if step_count >= self.steps_number:
-			return node.compute_node()[0] # return f
-
 		f, u, d, a, p, delta = node.compute_node()
+		self.tree_elements.append((f, delta, node.initial_price, step_count))
+
+		if step_count >= self.steps_number:
+			return f
 
 		next_node_up, next_node_down = node.return_next_nodes()
 
