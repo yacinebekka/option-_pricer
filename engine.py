@@ -1,28 +1,33 @@
 # Binomial tree option pricer implementation in Python
 
 # Handle the below option contracts 
-# 	- European/American call and put on stock w/o dividends
-#	- European/American call and put on stock w/ dividends (TODO)
-#	- European/American call and put on stock indices w/ or w/o dividends (TODO)
-#	- European/American call and put on foreign currency (TODO)
-#	- European/American call and put on futures contract (TODO)
+# 	- European/American call and put on stock w/ or w/o dividends
+#	- European/American call and put on stock indices w/ or w/o dividends
+#	- European/American call and put on foreign currency 
+#	- European/American call and put on futures contract
 
 import math
 from operator import attrgetter
 
 
 class BinomialTree:
-	def __init__(self, option_class: str, option_type: str, initial_price: float, volatility: float, risk_free_rate: float, strike_price: int, time_step: float, steps_number: int):
+	def __init__(self, option_class: str, option_type: str, asset_type: str, initial_price: float, volatility: float, 
+					risk_free_rate: float, strike_price: int, time_step: float, steps_number: int, dividend_rate: float = 0,
+					foreign_risk_free_rate: float = 0):
 		'''
 		Init the tree by initializing the first node
 		'''
 		self.option_class = option_class
 		self.option_type = option_type
+		self.asset_type = asset_type
 		self.volatility = volatility
 		self.risk_free_rate = risk_free_rate
 		self.strike_price = strike_price
 		self.time_step = time_step
 		self.steps_number = steps_number
+		self.dividend_rate =  dividend_rate
+		self.foreign_risk_free_rate = foreign_risk_free_rate
+
 		self.nodes = []
 		self.initial_node = BinomialTreeNode(initial_price, 0, self)
 
@@ -124,8 +129,18 @@ class BinomialTreeNode:
 		'''
 		self.u = math.exp(self.tree.volatility * math.sqrt(self.tree.time_step))
 		self.d = math.exp((0 - self.tree.volatility) * math.sqrt(self.tree.time_step))
-		self.a = math.exp(self.tree.risk_free_rate * self.tree.time_step)
-		self.p = (self.a - self.d) / (self.u - self.d)
+
+		if (self.tree.asset_type == "stock" or self.tree.asset_type == "stock_index") and self.tree.dividend_rate > 0: # Handle dividend-paying stocks & stock indices
+			self.a = math.exp((self.tree.risk_free_rate - self.tree.dividend_rate) * self.tree.time_step)
+		elif self.tree.asset_type == "currency" and self.tree.foreign_risk_free_rate > 0: # Handle currency for foreign risk free rate
+			self.a = math.exp((self.tree.risk_free_rate - self.tree.foreign_risk_free_rate) * self.tree.time_step)
+		else:
+			self.a = math.exp(self.tree.risk_free_rate * self.tree.time_step)
+
+		if self.tree.asset_type == "future":
+			self.p = (1 - self.d) / (self.u - self.d)
+		else:
+			self.p = (self.a - self.d) / (self.u - self.d)
 
 		s0_d = round(self.asset_price * self.d, 2)
 		s0_u = round(self.asset_price * self.u, 2)
@@ -134,4 +149,3 @@ class BinomialTreeNode:
 		self.up_child = BinomialTreeNode(s0_u, step_count, self.tree)
 
 		return self.up_child, self.down_child
-
