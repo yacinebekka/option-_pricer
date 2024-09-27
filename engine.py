@@ -1,21 +1,22 @@
 ### Binomial tree class implementation
 
-## Handle only both European call and put numerical precision to be checked
+## Handle only both European call and put & American 
 
 import math
 from operator import attrgetter
 
 class BinomialTreeNode:
-	def __init__(self, initial_price: float, volatility: float, risk_free_rate: float, strike_price: int, time_step: float, option_class: str, step_count: int):
+	def __init__(self, initial_price: float, volatility: float, risk_free_rate: float, strike_price: int, time_step: float, option_class: str, step_count: int, option_type: str):
 		self.initial_price = initial_price
 		self.volatility = volatility
 		self.risk_free_rate = risk_free_rate
 		self.strike_price = strike_price
 		self.time_step = time_step
-		self.option_class = option_class
 		self.option_price = 0
 		self.delta = 0
 		self.step_count = step_count
+		self.option_class = option_class
+		self.option_type = option_type
 
 		# Intermediate values
 		self.u = 0
@@ -40,8 +41,8 @@ class BinomialTreeNode:
 																						self.step_count)
 
 	def __repr__(self):
-		return ("{} option with S0 = {}, volatility = {}, risk_free_rate = {}," 
-						"strike_price = {}, time_step = {}, option_price = {}"
+		return ("{} option with S0 = {}, volatility = {}, risk_free_rate = {}, " 
+						"strike_price = {}, time_step = {}, option_price = {}, "
 						"step_count = {}"												).format(self.option_class,
 																						self.initial_price,
 																						self.volatility,
@@ -50,6 +51,11 @@ class BinomialTreeNode:
 																						self.time_step,
 																						self.option_price,
 																						self.step_count)
+
+
+	## Add __eq__ method to allow merging of identic nodes before computation
+
+
 	def compute_node(self, step_count):
 		'''
 		Build the node
@@ -62,8 +68,8 @@ class BinomialTreeNode:
 		S0_d = round(self.initial_price * self.d, 4)
 		S0_u = round(self.initial_price * self.u, 4)
 
-		self.down_child = BinomialTreeNode(S0_d, self.volatility, self.risk_free_rate, self.strike_price, self.time_step, self.option_class, step_count)
-		self.up_child = BinomialTreeNode(S0_u, self.volatility, self.risk_free_rate, self.strike_price, self.time_step, self.option_class, step_count)
+		self.down_child = BinomialTreeNode(S0_d, self.volatility, self.risk_free_rate, self.strike_price, self.time_step, self.option_class, step_count, self.option_type)
+		self.up_child = BinomialTreeNode(S0_u, self.volatility, self.risk_free_rate, self.strike_price, self.time_step, self.option_class, step_count, self.option_type)
 
 		return self.up_child, self.down_child
 
@@ -75,7 +81,7 @@ class BinomialTree:
 		'''
 		Init the tree by initializing the first node
 		'''
-		self.initial_node = BinomialTreeNode(initial_price, volatility, risk_free_rate, strike_price, time_step, option_class, 0)
+		self.initial_node = BinomialTreeNode(initial_price, volatility, risk_free_rate, strike_price, time_step, option_class, 0, option_type)
 		self.steps_number = steps_number
 		self.tree_elements = []
 
@@ -108,5 +114,17 @@ class BinomialTree:
 				node.option_price = round(payoff, 4)
 
 			else:
+				if self.initial_node.option_class == "call":
+					early_exercise_payoff = max(node.initial_price - node.strike_price, 0)
+				if self.initial_node.option_class == "put":
+					early_exercise_payoff = max(node.strike_price - node.initial_price, 0)
+
 				discounted_EV = math.exp(-node.risk_free_rate * node.time_step) * (node.p * node.up_child.option_price + (1 - node.p) * node.down_child.option_price)
-				node.option_price = round(discounted_EV, 4)
+
+				if self.initial_node.option_type == "european":
+					node.option_price = round(discounted_EV, 4)
+				if self.initial_node.option_type == "american":
+					node.option_price = round(max(early_exercise_payoff, discounted_EV), 4)
+
+				node.delta = (node.up_child.option_price - node.down_child.option_price) / (node.up_child.initial_price - node.down_child.initial_price)
+				
