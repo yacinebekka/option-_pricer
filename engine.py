@@ -1,5 +1,4 @@
 ### Binomial tree class implementation
-
 ## Handle only both European call and put & American 
 
 import math
@@ -18,6 +17,9 @@ class BinomialTreeNode:
 		self.option_class = option_class
 		self.option_type = option_type
 
+		if option_type == "american":
+			self.is_early_exercise_optimal = False
+
 		# Intermediate values
 		self.u = 0
 		self.d = 0
@@ -31,30 +33,34 @@ class BinomialTreeNode:
 	def __str__(self):
 		return ("{} option with S0 = {}, volatility = {}, risk_free_rate = {}, " 
 						"strike_price = {}, time_step = {}, option_price = {} "
-						"step_count = {}"												).format(self.option_class,
-																						self.initial_price,
-																						self.volatility,
-																						self.risk_free_rate,
-																						self.strike_price,
-																						self.time_step,
-																						self.option_price,
-																						self.step_count)
+						"step_count = {}").format(self.option_class,
+												self.initial_price,
+												self.volatility,
+												self.risk_free_rate,
+												self.strike_price,
+												self.time_step,
+												self.option_price,
+												self.step_count)
 
 	def __repr__(self):
 		return ("{} option with S0 = {}, volatility = {}, risk_free_rate = {}, " 
 						"strike_price = {}, time_step = {}, option_price = {}, "
-						"step_count = {}"												).format(self.option_class,
-																						self.initial_price,
-																						self.volatility,
-																						self.risk_free_rate,
-																						self.strike_price,
-																						self.time_step,
-																						self.option_price,
-																						self.step_count)
+						"step_count = {}").format(self.option_class,
+													self.initial_price,
+													self.volatility,
+													self.risk_free_rate,
+													self.strike_price,
+													self.time_step,
+													self.option_price,
+													self.step_count)
 
 
 	## Add __eq__ method to allow merging of identic nodes before computation
+	def __eq__(self, other):
+		return (self.initial_price, self.step_count) == (other.initial_price, other.step_count)
 
+	def __hash__(self):
+		return hash((self.initial_price, self.step_count))
 
 	def compute_node(self, step_count):
 		'''
@@ -65,8 +71,8 @@ class BinomialTreeNode:
 		self.a = math.exp(self.risk_free_rate * self.time_step)
 		self.p = (self.a - self.d) / (self.u - self.d)
 
-		S0_d = round(self.initial_price * self.d, 4)
-		S0_u = round(self.initial_price * self.u, 4)
+		S0_d = round(self.initial_price * self.d, 2)
+		S0_u = round(self.initial_price * self.u, 2)
 
 		self.down_child = BinomialTreeNode(S0_d, self.volatility, self.risk_free_rate, self.strike_price, self.time_step, self.option_class, step_count, self.option_type)
 		self.up_child = BinomialTreeNode(S0_u, self.volatility, self.risk_free_rate, self.strike_price, self.time_step, self.option_class, step_count, self.option_type)
@@ -87,20 +93,33 @@ class BinomialTree:
 
 	def build_tree(self, node, step_count=0):
 		'''
-		Build binomial tree
+		Build binomial tree | Optimized to avoid to duplication of nodes
 		'''
-		next_node_up, next_node_down = node.compute_node(step_count + 1)
-		self.tree_elements.append(node)
-		print(node)
+		if node not in self.tree_elements:
+			next_node_up, next_node_down = node.compute_node(step_count + 1)
+			self.tree_elements.append(node)
+			print(node)
 
-		if step_count >= self.steps_number:
-			return None
+			if step_count >= self.steps_number:
+				return None
 
-		self.build_tree(next_node_up, step_count + 1)
-		self.build_tree(next_node_down, step_count + 1)
+			if next_node_up not in self.tree_elements:
+				self.build_tree(next_node_up, step_count + 1)
+			else:
+				node_index = self.tree_elements.index(next_node_up)
+				node.up_child = self.tree_elements[node_index]
+
+			if next_node_down not in self.tree_elements:
+				self.build_tree(next_node_down, step_count + 1)
+			else:
+				node_index = self.tree_elements.index(next_node_down)
+				node.down_child = self.tree_elements[node_index]
 
 	def backward_pass(self):
-		self.tree_elements.sort(key=attrgetter("step_count"))
+		'''
+		Backward pass to compute option fair value
+		'''
+		self.tree_elements.sort(key=attrgetter("step_count", "initial_price"))
 		self.tree_elements = list(reversed(self.tree_elements))
 
 		for node in self.tree_elements:
@@ -111,7 +130,7 @@ class BinomialTree:
 				if self.initial_node.option_class == "put":
 					payoff = max(node.strike_price - node.initial_price, 0)
 
-				node.option_price = round(payoff, 4)
+				node.option_price = round(payoff, 2)
 
 			else:
 				if self.initial_node.option_class == "call":
@@ -124,7 +143,8 @@ class BinomialTree:
 				if self.initial_node.option_type == "european":
 					node.option_price = round(discounted_EV, 4)
 				if self.initial_node.option_type == "american":
-					node.option_price = round(max(early_exercise_payoff, discounted_EV), 4)
+					node.option_price = round(max(early_exercise_payoff, discounted_EV), 2)
+					if early_exercise_payoff > discounted_EV:
+						node.is_early_exercise_optimal = True
 
 				node.delta = (node.up_child.option_price - node.down_child.option_price) / (node.up_child.initial_price - node.down_child.initial_price)
-				
