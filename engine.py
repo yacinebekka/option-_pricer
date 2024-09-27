@@ -16,6 +16,18 @@ class BinomialTree:
 					foreign_risk_free_rate: float = 0):
 		'''
 		Init the tree by initializing the first node
+
+		option_class : Class of option contract ("put" for put option, "call" for call option)
+		option_type : Type of the option contract ("american" for American option, "european" for European option)
+		asset_type : Type of the underlying asset ("stock" for stock, "stock_index" for stock index, "currency" for foreign currency, "future" for futures contract)
+		initial_price : Price of the underlying asset at time 0
+		volatility : Annualized volatility of the underlying asset price
+		risk_free_rate : Risk free rate
+		strike_price : Strike price of the option contract (also called exercise price)
+		time_step : Time increment for each step of the binomial tree, on annualized basis (1 = 12 months, 1/12 = 1 month)
+		steps_number : Number of time increment of the binomial tree
+		dividend_rate : (Optional) Dividend rate of the underlying stock or the underlying stock index
+		foreign_risk_free_rate : (Optional) Foreign risk free rate of the underlying forign currency
 		'''
 		self.option_class = option_class
 		self.option_type = option_type
@@ -33,7 +45,10 @@ class BinomialTree:
 
 	def build_tree(self, node, step_count=0):
 		'''
-		Build binomial tree | Optimized to avoid to duplication of nodes
+		Recursive function to build binomial tree (optimized to avoid to duplication of nodes)
+
+		node : Tree node to build upon
+		step_count : Time increment index of the node
 		'''
 		if node not in self.nodes:
 			next_node_up, next_node_down = node.compute_node(step_count + 1)
@@ -81,7 +96,7 @@ class BinomialTree:
 				discounted_EV = math.exp(-self.risk_free_rate * self.time_step) * (node.p * node.up_child.option_price + (1 - node.p) * node.down_child.option_price)
 
 				if self.option_type == "european":
-					node.option_price = round(discounted_EV, 4)
+					node.option_price = round(discounted_EV, 2)
 				if self.option_type == "american":
 					node.option_price = round(max(early_exercise_payoff, discounted_EV), 2)
 					if early_exercise_payoff > discounted_EV:
@@ -92,6 +107,12 @@ class BinomialTree:
 
 class BinomialTreeNode:
 	def __init__(self, asset_price: float, step_count: int, tree: BinomialTree):
+		'''
+		Initialize node of the binomial tree
+
+		asset_price : Price of the underlying asset at the node
+		step_count : Time increment index of the node
+		'''
 		self.asset_price = asset_price
 		self.tree = tree
 		self.option_price = 0
@@ -112,10 +133,10 @@ class BinomialTreeNode:
 		self.up_child = None
 
 	def __str__(self):
-		return "Node with asset_price = {}, option_price = {}, step_count = {}".format(self.asset_price, self.step_count, self.option_price)
+		return "Node with asset_price = {}, option_price = {}, step_count = {}".format(self.asset_price, self.option_price, self.step_count)
 
 	def __repr__(self):
-		return "Node with asset_price = {}, option_price = {}, step_count = {}".format(self.asset_price, self.step_count, self.option_price)
+		return "Node with asset_price = {}, option_price = {}, step_count = {}".format(self.asset_price, self.option_price, self.step_count)
 
 	def __eq__(self, other):
 		return (self.asset_price, self.step_count) == (other.asset_price, other.step_count)
@@ -125,7 +146,9 @@ class BinomialTreeNode:
 
 	def compute_node(self, step_count):
 		'''
-		Build the node
+		Build the node and return the next up and down nodes
+
+		step_count : Time increment index of the node
 		'''
 		self.u = math.exp(self.tree.volatility * math.sqrt(self.tree.time_step))
 		self.d = math.exp((0 - self.tree.volatility) * math.sqrt(self.tree.time_step))
@@ -137,7 +160,7 @@ class BinomialTreeNode:
 		else:
 			self.a = math.exp(self.tree.risk_free_rate * self.tree.time_step)
 
-		if self.tree.asset_type == "future":
+		if self.tree.asset_type == "future": # Handle risk-neutral probability for options on futures contract
 			self.p = (1 - self.d) / (self.u - self.d)
 		else:
 			self.p = (self.a - self.d) / (self.u - self.d)
